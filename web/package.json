@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "node scripts/build.mjs",
-    "start": "vite preview",
+    "start": "node scripts/preview.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "content:build": "tsx scripts/build-content.ts",

@@ -3,7 +3,9 @@
 // the event loop normally; all nonzero exits keep their original behavior.
 const exit = process.exit.bind(process);
 let complete;
-const exported = new Promise((resolve) => { complete = resolve; });
+const exported = new Promise((resolve) => {
+  complete = resolve;
+});
 process.exit = (code) => {
   if (code === 0) {
     process.exitCode = 0;

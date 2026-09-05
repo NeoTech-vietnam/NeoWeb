@@ -17,6 +17,10 @@ npm run dev
 Open the local address printed by the server. No machine-specific source path is
 stored in the repository. The generated content is excluded from Git.
 
+After a production build, `npm start` serves the static artifact on port 4175.
+Use the same `NEOWEB_BASE_PATH` for build and preview (set it to `/NeoWeb` for
+the Pages release). This preview does not run a server-rendered application.
+
 ## Version one
 
 - Roadmap dashboard, topic pages, searchable file tree, Markdown links and backlinks.

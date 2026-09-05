@@ -1,0 +1,379 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "parents": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "date": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string"
+    },
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "pins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "parentPath": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "repository",
+          "sha",
+          "parentPath"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "topics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "description": {
+            "type": "string"
+          },
+          "roadmapAnchor": {
+            "type": "string"
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exercises": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prerequisites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "parentId",
+          "depth",
+          "description",
+          "roadmapAnchor",
+          "resources",
+          "documents",
+          "exercises",
+          "prerequisites"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "blob": {
+            "type": "string"
+          },
+          "contentHash": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "document",
+              "source"
+            ]
+          },
+          "topicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "headings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "depth": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "text",
+                "depth"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "outbound": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "backlinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "related": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prerequisites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "estimatedMinutes": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "path",
+          "repository",
+          "sha",
+          "blob",
+          "contentHash",
+          "title",
+          "summary",
+          "kind",
+          "topicId",
+          "headings",
+          "outbound",
+          "backlinks",
+          "assets",
+          "related",
+          "prerequisites"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "exercises": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "topicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notePath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "documentationPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "solutions": {
+            "type": "object",
+            "properties": {
+              "c": {
+                "type": "string"
+              },
+              "cpp": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "promptHash": {
+            "type": "string"
+          },
+          "hintHashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "snapshot": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "topicId",
+          "notePath",
+          "documentationPath",
+          "solutions",
+          "promptHash",
+          "hintHashes",
+          "snapshot"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "added",
+              "removed",
+              "modified",
+              "renamed"
+            ]
+          },
+          "oldPath": {
+            "type": "string"
+          },
+          "beforeHash": {
+            "type": "string"
+          },
+          "afterHash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "sha",
+    "parents",
+    "refs",
+    "date",
+    "message",
+    "author",
+    "version",
+    "pins",
+    "topics",
+    "documents",
+    "exercises",
+    "changes"
+  ],
+  "additionalProperties": false
+}

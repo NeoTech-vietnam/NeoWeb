@@ -1,0 +1,66 @@
+{
+  "groups": {
+    "soft-skills": ["04_Soft-Skills"],
+    "electronics": ["01_Hardware/01_Electronics"],
+    "using-test-equipment": ["01_Hardware/02_Test-Equipment"],
+    "prototyping-skills": ["01_Hardware/03_Prototyping-Skills"],
+    "fpga-development": ["01_Hardware/04_FPGA-Development"],
+    "programming-fundamentals": ["02_Software/02_Programming-Fundamentals"],
+    "programming-languages": ["02_Software/01_Programming-Languages"],
+    "microcontrollers": ["02_Software/03_Microcontrollers"],
+    "interfaces-protocols-and-communication-technologies": [
+      "03_Interfaces-and-Protocols"
+    ],
+    "memory-technologies-and-file-systems": [
+      "02_Software/10_Memory-Technologies-and-File-Systems"
+    ],
+    "hardware-simulation-emulation": [
+      "02_Software/11_Hardware-Simulation-Emulation"
+    ],
+    "sensors-and-actuators": ["02_Software/12_Sensors-and-Actuators"],
+    "digital-signal-processing": ["02_Software/13_Digital-Signal-Processing"],
+    "control-theory": ["02_Software/14_Control-Theory"],
+    "operating-systems": [
+      "02_Software/04_Operating-Systems",
+      "Examples/ESP32/FreeRTOS",
+      "Examples/ESP32/Zephyr",
+      "Examples/Linux"
+    ],
+    "debugging": ["02_Software/06_Debugging"],
+    "build-system": ["02_Software/05_Build-System"],
+    "software-development-life-cycle-sdlc-models": [
+      "02_Software/08_SDLC-Models"
+    ],
+    "version-control-systems": ["02_Software/07_Version-Control"],
+    "testing": ["02_Software/09_Testing"],
+    "embedded-security": ["02_Software/15_Embedded-Security"],
+    "embedded-gui": ["02_Software/16_Embedded-GUI"],
+    "iot-internet-of-things": ["02_Software/17_IoT"],
+    "edge-ai": ["02_Software/18_Edge-AI"],
+    "autosar-architecture": ["02_Software/19_AUTOSAR"],
+    "appendix-a-advanced-topics": ["05_Advanced-Topics"]
+  },
+  "aliases": {
+    "c-plus-plus": ["cpp"],
+    "algorithms-and-data-structures": ["algorithms-and-data-structures"],
+    "basic-calculus": ["basic-math-and-calculus"],
+    "logic-protocol-analyzer": ["logic-protocol-analyzer"],
+    "adc": ["adc-dac"],
+    "real-time-operating-systems": ["rtos"],
+    "operating-system-fundamentals": ["os-fundamentals"],
+    "compilers-gcc": ["compilers-gcc"],
+    "agile-scrum": ["agile-scrum"],
+    "test-driven-development-tdd": ["tdd-and-unit-testing"],
+    "standards-and-certifications": ["standards-and-certifications"],
+    "network-protocols-socket-programming": ["network"],
+    "basic-protocols": ["basic"],
+    "wireless-protocols": ["wireless"],
+    "industrial-protocols": ["industrial"],
+    "high-speed-protocols": ["high-speed"],
+    "automotive-protocols": ["automotive"],
+    "cellular-communication": ["cellular"],
+    "digital-audio-protocols": ["digital-audio-protocols"],
+    "display-and-camera-protocols": ["display-and-camera-protocols"]
+  },
+  "exercises": {}
+}

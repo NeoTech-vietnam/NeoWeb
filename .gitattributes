@@ -1,0 +1,2 @@
+# Bundled third-party template strings retain whitespace by design.
+integration/neolearning/.github/neoweb/check-markdown.mjs linguist-generated=true whitespace=-blank-at-eol

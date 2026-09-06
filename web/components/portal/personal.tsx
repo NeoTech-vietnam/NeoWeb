@@ -13,6 +13,8 @@ import {
   Link2,
   Unplug,
   Check,
+  SkipBack,
+  SkipForward,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,7 @@ import {
   type LearningStateV1,
 } from '@/lib/learning-state';
 import { SpotifyClient, CalendarClient } from '@/lib/integrations';
+import { bindSpotifySync } from '@/lib/spotify-sync';
 import { publicBase, href } from '@/lib/routes';
 import type { TopicRecord } from '@/lib/content-schema';
 import type { UpdateState } from './dashboard';
@@ -161,14 +164,18 @@ export function IntegrationCards() {
     const refresh = () => {
       if (alive) render((n) => n + 1);
     };
-    void pair.spotify
-      .finishCallback()
-      .then((handled) => (handled ? undefined : pair.spotify.refresh()))
-      .then(refresh);
+    const unsubscribe = pair.spotify.subscribe(refresh);
+    let stopSync = () => {};
+    void pair.spotify.finishCallback().then(() => {
+      if (alive) stopSync = bindSpotifySync(pair.spotify);
+      refresh();
+    });
     void pair.calendar.initialize().then(refresh);
     setReady(true);
     return () => {
       alive = false;
+      stopSync();
+      unsubscribe();
     };
   }, []);
   if (!ready)
@@ -188,6 +195,8 @@ export function IntegrationCards() {
   const refresh = () => render((n) => n + 1);
   const sp = pair.spotify;
   const cal = pair.calendar;
+  const toggleCommand = sp.value?.isPlaying ? 'pause' : 'play';
+  const offline = !navigator.onLine;
   const action = (operation: () => Promise<void>) => {
     const result = operation();
     refresh();
@@ -229,6 +238,82 @@ export function IntegrationCards() {
             )}
           </>
         )}
+        {sp.connected && (
+          <>
+            <div
+              className="spotify-controls"
+              role="group"
+              aria-label="Spotify playback controls"
+              aria-busy={sp.pendingCommand !== null}
+            >
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Previous track"
+                title={sp.controlReason('previous') ?? 'Previous track'}
+                disabled={offline || !!sp.controlReason('previous')}
+                onClick={() => void sp.previous()}
+              >
+                <SkipBack />
+              </Button>
+              <Button
+                size="icon"
+                aria-label={
+                  sp.value?.isPlaying ? 'Pause Spotify' : 'Play Spotify'
+                }
+                title={
+                  sp.controlReason(toggleCommand) ??
+                  (sp.value?.isPlaying ? 'Pause Spotify' : 'Play Spotify')
+                }
+                disabled={offline || !!sp.controlReason(toggleCommand)}
+                onClick={() => void sp[toggleCommand]()}
+              >
+                {sp.value?.isPlaying ? <Pause /> : <Play />}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Next track"
+                title={sp.controlReason('next') ?? 'Next track'}
+                disabled={offline || !!sp.controlReason('next')}
+                onClick={() => void sp.next()}
+              >
+                <SkipForward />
+              </Button>
+            </div>
+            <p className="fine-print spotify-device">
+              {sp.device?.name
+                ? `Device: ${sp.device.name}`
+                : 'Open Spotify and start playing on a device first.'}
+              {sp.device?.restricted &&
+                ' · Remote controls unavailable on this device.'}
+            </p>
+            <p
+              className="fine-print spotify-sync"
+              role="status"
+              aria-live="polite"
+            >
+              {sp.pendingCommand
+                ? 'Sending command to Spotify…'
+                : offline
+                  ? 'Offline · Showing last known playback'
+                  : sp.stale
+                    ? 'Out of date · Showing last known playback'
+                    : sp.lastSyncedAt
+                      ? `Synced ${new Date(sp.lastSyncedAt).toLocaleTimeString()}`
+                      : 'Waiting for playback information'}
+            </p>
+            {!sp.canControl && (
+              <Button
+                variant="outline"
+                disabled={offline || sp.status === 'connecting'}
+                onClick={() => action(() => sp.connect())}
+              >
+                Reconnect to enable controls
+              </Button>
+            )}
+          </>
+        )}
         {sp.error && (
           <p className="widget-error" role="status">
             {sp.error}
@@ -239,25 +324,39 @@ export function IntegrationCards() {
             <a className="text-link" href={href({ view: 'settings' })}>
               Set up Spotify <Link2 size={13} />
             </a>
-          ) : ['disconnected', 'expired', 'error', 'forbidden'].includes(
-              sp.status,
-            ) ? (
+          ) : ['disconnected', 'expired', 'forbidden'].includes(sp.status) ? (
             <Button
               variant="outline"
+              disabled={offline}
               onClick={() => action(() => sp.connect())}
             >
-              Connect Spotify
+              {sp.connected ? 'Reconnect Spotify' : 'Connect Spotify'}
             </Button>
           ) : (
             <Button
               variant="ghost"
-              disabled={sp.status === 'connecting' || sp.retryAt > Date.now()}
+              disabled={
+                offline ||
+                sp.syncing ||
+                !!sp.pendingCommand ||
+                sp.status === 'connecting' ||
+                sp.retryAt > Date.now()
+              }
               onClick={() => action(() => sp.refresh())}
             >
               <RefreshCw /> Refresh
             </Button>
           )}
-          {sp.value && (
+          {sp.connected && !Number.isFinite(sp.retryAt) && (
+            <Button
+              variant="outline"
+              disabled={offline}
+              onClick={() => action(() => sp.connect())}
+            >
+              Reconnect Spotify
+            </Button>
+          )}
+          {sp.connected && (
             <Button
               variant="ghost"
               size="icon"
@@ -489,8 +588,8 @@ export function SettingsView({
         <section className="panel">
           <h2>Spotify connection</h2>
           <p>
-            Enter your public Spotify application client ID. Your app uses
-            read-only access with PKCE.
+            Enter your public Spotify application client ID. Your app uses PKCE
+            with read access and remote playback controls for Spotify Premium.
           </p>
           <label className="field-label">
             Client ID

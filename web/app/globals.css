@@ -1003,6 +1003,26 @@ p {
   font-size: 0.75rem;
   color: #85d7a0;
 }
+.spotify-controls {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-block: 1rem 0.5rem;
+}
+.spotify-controls button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.music-card .widget-actions {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.music-card .spotify-device,
+.music-card .spotify-sync {
+  overflow-wrap: anywhere;
+  color: #b4c1dc;
+}
 .widget-actions {
   display: flex;
   align-items: center;

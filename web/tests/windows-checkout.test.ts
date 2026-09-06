@@ -36,7 +36,7 @@ afterEach(() => {
   }
 });
 
-function checkout(environment: NodeJS.ProcessEnv) {
+function checkout(environment: Record<string, string>) {
   const root = fs.mkdtempSync(
     path.join(temporaryBase, 'neoweb-longpath-runner-workspace-'),
   );

@@ -50,13 +50,16 @@ function sessionStorage(): StorageLike {
 }
 const SPOTIFY_TOKEN_KEY = 'neoweb.oauth.spotify.tokens';
 const SPOTIFY_PENDING_KEY = 'neoweb.oauth.spotify.pending';
-const SPOTIFY_SCOPE = 'user-read-currently-playing user-read-playback-state';
+const SPOTIFY_SCOPE =
+  'user-read-currently-playing user-read-playback-state user-modify-playback-state';
+export type PlaybackCommand = 'play' | 'pause' | 'next' | 'previous';
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly';
 const tokensSchema = z
   .object({
     accessToken: z.string().min(1),
     refreshToken: z.string().optional(),
     expiresAt: z.number(),
+    scopes: z.array(z.string()).optional(),
   })
   .strict();
 const tokenResponseSchema = z.object({
@@ -72,6 +75,7 @@ const pendingSchema = z
     createdAt: z.number(),
     redirectUri: z.string(),
     returnHash: z.string(),
+    scopes: z.array(z.string()).optional(),
   })
   .strict();
 const base64url = (bytes: Uint8Array) =>
@@ -117,6 +121,20 @@ export class SpotifyClient {
   error: string | null = null;
   value: NowPlaying | null = null;
   retryAt = 0;
+  device: { name: string; active: boolean; restricted: boolean } | null = null;
+  pendingCommand: PlaybackCommand | null = null;
+  lastSyncedAt: number | null = null;
+  stale = false;
+  syncing = false;
+  private disallows: Record<string, unknown> = {};
+  private readTask: Promise<void> | undefined;
+  private readRevision = 0;
+  private listeners = new Set<() => void>();
+  private syncActive = false;
+  private syncEpoch = 0;
+  private failures = 0;
+  private pollTimer: ReturnType<typeof setTimeout> | undefined;
+  private followupTimers = new Set<ReturnType<typeof setTimeout>>();
   private tokens: z.infer<typeof tokensSchema> | null = null;
   private storage: StorageLike;
   private generation = 0;
@@ -141,9 +159,196 @@ export class SpotifyClient {
     }
   }
 
+  get connected(): boolean {
+    return !!this.tokens && !!this.options.clientId;
+  }
+  get canControl(): boolean {
+    return this.tokens?.scopes?.includes('user-modify-playback-state') === true;
+  }
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+  private emit(): void {
+    for (const listener of this.listeners) listener();
+  }
+  setSyncActive(active: boolean): void {
+    if (active === this.syncActive) return;
+    this.syncActive = active;
+    this.emit();
+    const epoch = ++this.syncEpoch;
+    this.clearTimers();
+    if (!active) {
+      this.readRevision++;
+      return;
+    }
+    const resume = () => {
+      if (this.syncActive && epoch === this.syncEpoch && this.autoAllowed)
+        void this.refresh();
+    };
+    if (this.readTask) void this.readTask.then(resume);
+    else resume();
+  }
+  private get autoAllowed(): boolean {
+    return (
+      this.connected &&
+      !['expired', 'forbidden', 'connecting'].includes(this.status) &&
+      Number.isFinite(this.retryAt)
+    );
+  }
+  private clearTimers(): void {
+    clearTimeout(this.pollTimer);
+    for (const timer of this.followupTimers) clearTimeout(timer);
+    this.followupTimers.clear();
+  }
+  private scheduleNext(): void {
+    clearTimeout(this.pollTimer);
+    if (!this.syncActive || !this.autoAllowed || this.pendingCommand) return;
+    const delay =
+      this.retryAt > this.now()
+        ? this.retryAt - this.now()
+        : this.status === 'error'
+          ? [15_000, 30_000, 60_000][
+              Math.min(Math.max(this.failures - 1, 0), 2)
+            ]!
+          : this.value?.isPlaying
+            ? 5_000
+            : 15_000;
+    this.pollTimer = setTimeout(
+      () => {
+        void this.refresh();
+      },
+      Math.min(delay, 2_147_483_647),
+    );
+  }
+  controlReason(command: PlaybackCommand): string | null {
+    if (!this.canControl) return 'Reconnect to enable controls.';
+    if (this.pendingCommand) return 'Waiting for Spotify…';
+    if (this.now() < this.retryAt)
+      return 'Spotify request limit reached. Wait before trying again.';
+    if (!this.device?.active)
+      return 'Open Spotify and start playing on a device first.';
+    if (this.device.restricted)
+      return 'This Spotify device does not allow remote controls.';
+    if (['expired', 'forbidden', 'connecting'].includes(this.status))
+      return this.error ?? 'Reconnect Spotify to continue.';
+    const action = {
+      play: 'resuming',
+      pause: 'pausing',
+      next: 'skipping_next',
+      previous: 'skipping_prev',
+    }[command];
+    if (this.disallows[action] === true)
+      return 'Spotify does not allow this action for the current playback.';
+    return null;
+  }
+  play(): Promise<void> {
+    return this.command('play');
+  }
+  pause(): Promise<void> {
+    return this.command('pause');
+  }
+  next(): Promise<void> {
+    return this.command('next');
+  }
+  previous(): Promise<void> {
+    return this.command('previous');
+  }
+  private async command(command: PlaybackCommand): Promise<void> {
+    if (this.pendingCommand) return;
+    const reason = this.controlReason(command);
+    if (reason) {
+      this.error = reason;
+      this.emit();
+      return;
+    }
+    const generation = this.generation;
+    this.pendingCommand = command;
+    this.clearTimers();
+    this.readRevision++;
+    this.error = null;
+    this.emit();
+    try {
+      await this.readTask;
+      if (generation !== this.generation || !this.tokens) return;
+      if (
+        this.tokens.expiresAt <= this.now() + 30_000 &&
+        !(await this.refreshToken())
+      )
+        return;
+      if (generation !== this.generation) return;
+      if (!this.canControl) {
+        this.error = 'Reconnect to enable controls.';
+        return;
+      }
+      const response = await this.fetcher(
+        `https://api.spotify.com/v1/me/player/${command}`,
+        {
+          method: command === 'play' || command === 'pause' ? 'PUT' : 'POST',
+          headers: { Authorization: 'Bearer ' + this.tokens!.accessToken },
+        },
+      );
+      if (generation !== this.generation) return;
+      if (this.handleResponseError(response)) return;
+      if (response.status === 404) {
+        this.device = null;
+        this.error = 'Open Spotify and start playing on a device first.';
+        return;
+      }
+      if (!response.ok)
+        throw new Error(
+          'Spotify could not confirm the command. Check Spotify before trying again.',
+        );
+      // Playback remains the last confirmed state until a subsequent read.
+      this.commandSucceeded();
+    } catch (error) {
+      if (generation === this.generation) this.fail(error);
+    } finally {
+      if (generation === this.generation) {
+        this.pendingCommand = null;
+        this.emit();
+        this.scheduleNext();
+      }
+    }
+  }
+  private commandSucceeded(): void {
+    if (!this.syncActive) return;
+    for (const delay of [1000, 3000]) {
+      const timer = setTimeout(() => {
+        this.followupTimers.delete(timer);
+        if (this.syncActive && this.autoAllowed) void this.refresh();
+      }, delay);
+      this.followupTimers.add(timer);
+    }
+  }
+  private handleResponseError(response: Response): boolean {
+    if (response.status === 401) {
+      this.status = 'expired';
+      this.error = 'Reconnect Spotify to continue.';
+    } else if (response.status === 403) {
+      this.status = 'forbidden';
+      this.error =
+        'Spotify restricted this account, device, or app. Check Premium, app allowlist, and reconnect permissions.';
+    } else if (response.status === 429) {
+      this.status = 'rate-limited';
+      this.retryAt = response.headers.has('Retry-After')
+        ? retryAt(response, this.now())
+        : Infinity;
+      this.error = Number.isFinite(this.retryAt)
+        ? 'Spotify request limit reached. Sync will resume after the cooldown.'
+        : 'Spotify quota exhausted without a retry deadline. Check the app quota, then reconnect to retry.';
+    } else return false;
+    this.clearTimers();
+    this.stale = this.value !== null;
+    return true;
+  }
+
   async connect(): Promise<void> {
     if (!this.options.clientId) return;
     this.generation++;
+    this.clearTimers();
     this.status = 'connecting';
     this.error = null;
     try {
@@ -184,6 +389,7 @@ export class SpotifyClient {
           createdAt: this.now(),
           redirectUri: redirect.href,
           returnHash: current.hash,
+          scopes: SPOTIFY_SCOPE.split(' '),
         }),
       );
       const url = new URL('https://accounts.spotify.com/authorize');
@@ -251,7 +457,7 @@ export class SpotifyClient {
         return true;
       }
       if (error) {
-        this.status = 'disconnected';
+        this.status = this.tokens ? 'ready' : 'disconnected';
         this.error = 'Spotify connection was not authorized.';
         return true;
       }
@@ -277,7 +483,8 @@ export class SpotifyClient {
         );
       const tokens = tokenResponseSchema.parse(await response.json());
       if (generation !== this.generation) return true;
-      this.saveTokens(tokens);
+      this.saveTokens(tokens, pending.scopes);
+      this.retryAt = 0;
       await this.refresh();
     } catch (error) {
       this.fail(error);
@@ -285,11 +492,18 @@ export class SpotifyClient {
     return true;
   }
 
-  private saveTokens(response: z.infer<typeof tokenResponseSchema>): void {
+  private saveTokens(
+    response: z.infer<typeof tokenResponseSchema>,
+    requestedScopes?: string[],
+  ): void {
     this.tokens = {
       accessToken: response.access_token,
       refreshToken: response.refresh_token ?? this.tokens?.refreshToken,
       expiresAt: this.now() + response.expires_in * 1000,
+      scopes:
+        response.scope !== undefined
+          ? response.scope.split(/\s+/).filter(Boolean)
+          : (requestedScopes ?? this.tokens?.scopes),
     };
     this.storage.setItem(SPOTIFY_TOKEN_KEY, JSON.stringify(this.tokens));
   }
@@ -323,6 +537,8 @@ export class SpotifyClient {
         }),
       },
     );
+    if (generation !== this.generation) return false;
+    if (this.handleResponseError(response)) return false;
     const body: unknown = await response.json();
     if (generation !== this.generation) return false;
     if (!response.ok) {
@@ -338,8 +554,29 @@ export class SpotifyClient {
     return true;
   }
 
-  async refresh(): Promise<void> {
+  refresh(): Promise<void> {
+    if (this.readTask) return this.readTask;
+    if (this.pendingCommand) return Promise.resolve();
+    clearTimeout(this.pollTimer);
+    this.syncing = true;
+    this.readTask = this.readPlayback().finally(() => {
+      this.readTask = undefined;
+      this.syncing = false;
+      if (
+        ['expired', 'forbidden', 'rate-limited', 'error'].includes(this.status)
+      )
+        this.stale = this.value !== null;
+      this.emit();
+      this.scheduleNext();
+    });
+    this.emit();
+    return this.readTask;
+  }
+  private async readPlayback(): Promise<void> {
     const generation = this.generation;
+    const revision = this.readRevision;
+    const current = () =>
+      generation === this.generation && revision === this.readRevision;
     if (!this.options.clientId) return;
     if (!this.tokens) {
       this.status = 'disconnected';
@@ -355,48 +592,45 @@ export class SpotifyClient {
         !(await this.refreshToken())
       )
         return;
-      if (generation !== this.generation) return;
+      if (!current()) return;
       const request = () =>
         this.fetcher(
-          'https://api.spotify.com/v1/me/player/currently-playing?additional_types=track,episode',
+          'https://api.spotify.com/v1/me/player?additional_types=track,episode',
           {
             headers: { Authorization: 'Bearer ' + this.tokens!.accessToken },
           },
         );
       let response = await request();
-      if (generation !== this.generation) return;
+      if (!current()) return;
       if (response.status === 401) {
-        if (!(await this.refreshToken()) || generation !== this.generation)
-          return;
+        if (!(await this.refreshToken()) || !current()) return;
         response = await request();
-        if (generation !== this.generation) return;
+        if (!current()) return;
       }
       this.error = null;
-      if (response.status === 401) {
-        this.status = 'expired';
-        this.error = 'Reconnect Spotify to continue.';
-        return;
-      }
-      if (response.status === 403) {
-        this.status = 'forbidden';
-        this.error =
-          'Spotify restricted this account or app. Check app allowlist and owner subscription.';
-        return;
-      }
-      if (response.status === 429) {
-        this.status = 'rate-limited';
-        this.retryAt = retryAt(response, this.now());
-        this.error = 'Spotify request limit reached. Try again later.';
-        return;
-      }
+      if (this.handleResponseError(response)) return;
       if (response.status === 204) {
         this.value = null;
+        this.device = null;
+        this.disallows = {};
+        this.confirmSync();
         this.status = 'empty';
         return;
       }
       if (!response.ok) throw new Error('Spotify is temporarily unavailable.');
       const body = object(await response.json());
-      if (generation !== this.generation) return;
+      if (!current()) return;
+      const device = object(body.device);
+      this.device = body.device
+        ? {
+            name: string(device.name),
+            active: device.is_active === true,
+            restricted: device.is_restricted === true,
+          }
+        : null;
+      const actions = object(body.actions);
+      this.disallows = object(actions.disallows ?? actions);
+      this.confirmSync();
       const item = object(body.item);
       if (!item.name) {
         this.value = null;
@@ -427,23 +661,41 @@ export class SpotifyClient {
       };
       this.status = 'ready';
     } catch (error) {
-      this.fail(error);
+      if (current()) {
+        this.failures++;
+        this.fail(error);
+      }
     }
+  }
+
+  private confirmSync(): void {
+    this.lastSyncedAt = this.now();
+    this.stale = false;
+    this.retryAt = 0;
+    this.failures = 0;
   }
 
   disconnect(): void {
     this.generation++;
+    this.clearTimers();
     this.tokens = null;
     this.value = null;
+    this.device = null;
+    this.pendingCommand = null;
+    this.lastSyncedAt = null;
+    this.stale = false;
     this.retryAt = 0;
     this.error = null;
     this.storage.removeItem(SPOTIFY_TOKEN_KEY);
     this.storage.removeItem(SPOTIFY_PENDING_KEY);
     this.status = this.options.clientId ? 'disconnected' : 'unconfigured';
+    this.emit();
   }
 
   private fail(error: unknown): void {
+    this.clearTimers();
     this.status = 'error';
+    this.stale = this.value !== null;
     this.error =
       error instanceof Error ? error.message : 'Spotify could not connect.';
   }

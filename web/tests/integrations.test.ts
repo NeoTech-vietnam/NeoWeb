@@ -69,7 +69,7 @@ describe('Spotify PKCE', () => {
     );
     expect(authorization.searchParams.get('code_challenge')).toHaveLength(43);
     expect(authorization.searchParams.get('scope')).toBe(
-      'user-read-currently-playing user-read-playback-state',
+      'user-read-currently-playing user-read-playback-state user-modify-playback-state',
     );
     app.callback();
     app.fetcher

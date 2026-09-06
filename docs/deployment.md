@@ -113,7 +113,22 @@ After deployment, check the exact URL emitted by the deployment job. Verify a de
 
 The app connects from the user's browser. It needs public OAuth client IDs, not client secrets. Enter the IDs in the portal's integration settings on each device.
 
-For Spotify, create a developer application and register the portal's exact HTTPS callback URI shown by the app, including the `/NeoWeb/` path and trailing slash. Authorize only `user-read-currently-playing` and `user-read-playback-state`. PKCE does not require a client secret. Development-mode account restrictions and Spotify eligibility still apply; an unavailable account or expired connection must leave the widget usable in its disconnected state. See [Spotify PKCE](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow).
+For Spotify, create a developer application and register the portal's exact HTTPS callback URI shown by the app, including the `/NeoWeb/` path and trailing slash. Authorize `user-read-currently-playing`, `user-read-playback-state`, and `user-modify-playback-state`. PKCE does not require a client secret. Premium is required for remote controls. Development-mode account restrictions and Spotify eligibility still apply. See [Spotify PKCE](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow) and [playback requirements](https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback).
+
+Existing Spotify connections remain readable. Click **Reconnect to enable controls** and approve
+the additional permission; there is no need to clear progress, change `.env`, or rebuild content.
+Open Spotify on your phone, computer, web player, or speaker and start a track first. NeoWeb
+controls the active device without switching devices or streaming audio inside the browser.
+The middle button reflects confirmed playback, so allow a few seconds for changes to appear.
+
+Automatic sync runs only on a visible, online dashboard: every 5 seconds while playing or 15
+seconds while paused/idle, measured after the preceding request finishes. Successful commands
+trigger reads after 1 and 3 seconds. Temporary read failures retain the last track with an
+out-of-date indicator and retry after 15, 30, then 60 seconds. Rate limits apply to manual Refresh
+and controls too. A quota response without a retry deadline stops retries: check Spotify app
+quota/eligibility before reconnecting. Authorization errors also require user intervention.
+If a command fails ambiguously, check Spotify before pressing again; NeoWeb never retries skips
+automatically. See [Spotify rate limits](https://developer.spotify.com/documentation/web-api/concepts/rate-limits).
 
 For Google Calendar, enable the Calendar API in a Google Cloud project, configure the OAuth consent screen, and create a Web application OAuth client. Add `https://neotech-vietnam.github.io` as an authorized JavaScript origin; origins do not include `/NeoWeb/`. Request only `https://www.googleapis.com/auth/calendar.events.readonly`. Add your account as a test user while the OAuth application is in testing. Google Identity Services obtains short-lived tokens through a user interaction. See [Google's browser token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model).
 

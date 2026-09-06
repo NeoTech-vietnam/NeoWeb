@@ -27,7 +27,16 @@ the Pages release). This preview does not run a server-rendered application.
 - 20 recent dev commits, main, and releases with exact recursive submodule pins.
 - C/C++ scratchpads, side-by-side notes, staged hints, solution reveal and text diffs.
 - Local progress and drafts, focus timer, review scheduling, JSON backup and restore.
-- Optional read-only Spotify and Google Calendar connections configured in Settings.
+- Optional Spotify remote playback controls and automatic track sync; read-only Google Calendar. Configure connections in Settings.
+
+### Spotify soundtrack
+
+Previous, Play/Pause, and Next control your currently active Spotify device (Premium required).
+Existing connections keep displaying tracks: choose **Reconnect to enable controls** once to grant
+the added playback permission. No `.env` changes or content rebuild are needed for this feature.
+Track information updates every 5 seconds while playing and 15 seconds while paused/idle;
+sync pauses when the dashboard is closed, hidden, or offline. Refresh remains optional.
+See [Spotify setup and troubleshooting](docs/deployment.md#spotify-and-google-calendar-setup).
 - Markdown validation, safe static compilation and protected-branch Pages workflows.
 
 Learner code is never compiled, executed, or uploaded. Progress stays in this

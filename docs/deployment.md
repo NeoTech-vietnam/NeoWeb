@@ -50,6 +50,14 @@ long-path support (expected failure) and with the actual job configuration.
 See [Git for Windows long paths](https://gitforwindows.org/git-cannot-create-a-file-or-directory-with-a-long-path.html)
 and [Git runtime configuration](https://git-scm.com/docs/git-config#Documentation/git-config.txt-GITCONFIGCOUNT).
 
+The Pages upload action also requires Bash and GNU tar on Windows. Before upload,
+the workflow validates the tools supplied with Git for Windows and adds their
+directory to `GITHUB_PATH` for subsequent action steps. This prevents Windows'
+WSL `bash.exe` alias or BSD tar from being selected. No WSL distribution, runner
+restart, or machine-wide PATH edit is required. Changing `defaults.run.shell`
+alone does not override a composite action's explicitly selected shell.
+See the [pinned Pages archive action](https://github.com/actions/upload-pages-artifact/blob/7b1f4a764d45c48632c6b24a0339c27f5614fb0b/action.yml).
+
 The website intentionally publishes curated learning material, including selected example content. Exclusion rules remove tooling directories, binaries, build outputs, and vendor archives. Review the generated inventory before the first public release.
 
 ## Workflows and trust boundaries

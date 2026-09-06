@@ -80,6 +80,13 @@ jobs:
       github.workflow_ref == format('{0}/.github/workflows/pages.yml@refs/heads/{1}', github.repository, github.event.repository.default_branch)
     runs-on: [self-hosted, neoweb-content]
     timeout-minutes: 60
+    # Git for Windows needs its own opt-in even with Windows long paths enabled.
+    # Runtime configuration survives checkout's temporary HOME and is inherited
+    # by recursive submodule Git processes, without changing the runner account.
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.longpaths
+      GIT_CONFIG_VALUE_0: 'true'
     defaults:
       run:
         working-directory: web

@@ -37,6 +37,19 @@ Check the recursive `.gitmodules` graph when adding submodules and extend the to
 
 The checkout action uses HTTPS and removes persisted credentials. All historical submodule objects must already be available in the recursive checkout; the v1 compiler fails explicitly if an object is missing and does not fetch it itself. Never put a credential into a clone URL, committed configuration, generated content, or frontend environment variable.
 
+### Windows runner paths
+
+The publication job sets Git's `core.longpaths=true` through its job environment
+before either checkout. Windows' `LongPathsEnabled` registry setting alone does
+not enable Git's separate long-path support. This is needed for deeply nested
+curriculum files under runner paths such as `D:\workspace\actions-runner\_work`.
+The setting is inherited by recursive submodule processes and does not require
+administrator access, a global Git configuration change, or a runner restart.
+The Windows regression test checks the reported algorithm filename both without
+long-path support (expected failure) and with the actual job configuration.
+See [Git for Windows long paths](https://gitforwindows.org/git-cannot-create-a-file-or-directory-with-a-long-path.html)
+and [Git runtime configuration](https://git-scm.com/docs/git-config#Documentation/git-config.txt-GITCONFIGCOUNT).
+
 The website intentionally publishes curated learning material, including selected example content. Exclusion rules remove tooling directories, binaries, build outputs, and vendor archives. Review the generated inventory before the first public release.
 
 ## Workflows and trust boundaries
